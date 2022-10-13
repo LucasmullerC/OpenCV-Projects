@@ -1,76 +1,87 @@
-import sys
-import cv2 as cv2
+import cv2
 import numpy as np
-from matplotlib import pyplot as plt
 
+def get8n(x, y, shape):
+    out = []
+    maxx = shape[1]-1
+    maxy = shape[0]-1
+    
+    #top left
+    outx = min(max(x-1,0),maxx)
+    outy = min(max(y-1,0),maxy)
+    out.append((outx,outy))
+    
+    #top center
+    outx = x
+    outy = min(max(y-1,0),maxy)
+    out.append((outx,outy))
+    
+    #top right
+    outx = min(max(x+1,0),maxx)
+    outy = min(max(y-1,0),maxy)
+    out.append((outx,outy))
+    
+    #left
+    outx = min(max(x-1,0),maxx)
+    outy = y
+    out.append((outx,outy))
+    
+    #right
+    outx = min(max(x+1,0),maxx)
+    outy = y
+    out.append((outx,outy))
+    
+    #bottom left
+    outx = min(max(x-1,0),maxx)
+    outy = min(max(y+1,0),maxy)
+    out.append((outx,outy))
+    
+    #bottom center
+    outx = x
+    outy = min(max(y+1,0),maxy)
+    out.append((outx,outy))
+    
+    #bottom right
+    outx = min(max(x+1,0),maxx)
+    outy = min(max(y+1,0),maxy)
+    out.append((outx,outy))
+    
+    return out
 
+def region_growing(img, seed):
+    print("Segmentando... aguarde... Este processo pode demorar.")
+    seed_points = []
+    outimg = np.zeros_like(img)
+    seed_points.append((seed[0], seed[1]))
+    processed = []
+    while(len(seed_points) > 0):
+        pix = seed_points[0]
+        outimg[pix[0], pix[1]] = 255
+        for coord in get8n(pix[0], pix[1], img.shape):
+            if img[coord[0], coord[1]] != 0:
+                outimg[coord[0], coord[1]] = 255
+                if not coord in processed:
+                    seed_points.append(coord)
+                processed.append(coord)
+        seed_points.pop(0)
+        #cv2.imshow("progress",outimg)
+        #cv2.waitKey(1)
+    return outimg
 
 def on_mouse(event, x, y, flags, params):
     if event == cv2.EVENT_LBUTTONDOWN:
-        print ('Posição a ser segmentada: ' + str(x) + ', ' + str(y))
-        s_box = x, y
-        boxes.append(s_box)
-
-def region_growing(img, seed):
-
-    neighbors = [(-1, 0), (1, 0), (0, -1), (0, 1)]
-    region_threshold = 0.2
-    region_size = 1
-    intensity_difference = 0
-    neighbor_points_list = []
-    neighbor_intensity_list = []
-    
-    region_mean = img[seed]
-
-    height, width = img.shape
-    image_size = height * width
-
-    segmented_img = np.zeros((height, width, 1), np.uint8)
-
-    while (intensity_difference < region_threshold) & (region_size < image_size):
-
-        for i in range(4):
-            x_new = seed[0] + neighbors[i][0]
-            y_new = seed[1] + neighbors[i][1]
-
-            check_inside = (x_new >= 0) & (y_new >= 0) & (x_new < height) & (y_new < width)
-
-            if check_inside:
-                if segmented_img[x_new, y_new] == 0:
-                    neighbor_points_list.append([x_new, y_new])
-                    neighbor_intensity_list.append(img[x_new, y_new])
-                    segmented_img[x_new, y_new] = 255
-
-        distance = abs(neighbor_intensity_list-region_mean)
-        pixel_distance = min(distance)
-        index = np.where(distance == pixel_distance)[0][0]
-        segmented_img[seed[0], seed[1]] = 255
-        region_size += 1
+        print ('Seed: ' + str(x) + ', ' + str(y), img[y,x])
+        clicks.append((y,x))
         
-        region_mean = (region_mean*region_size + neighbor_intensity_list[index])/(region_size+1)
-
-        seed = neighbor_points_list[index]
-        
-        neighbor_intensity_list[index] = neighbor_intensity_list[-1]
-        neighbor_points_list[index] = neighbor_points_list[-1]
-
-    return segmented_img
-    
-
-if __name__ == '__main__':
-
-    boxes = []
-    filename = 'kidney.png'
-    img = cv2.imread(filename, 0)
-    resized = cv2.resize(img,(256,256))
-    cv2.namedWindow('input')
-    cv2.setMouseCallback('input', on_mouse, 0,)
-    cv2.imshow('input', resized)
-    cv2.waitKey()
-    print ("Iniciando segmentação... Aguarde...")
-    seed = boxes[-1]
-    cv2.imshow('input', region_growing(resized, seed))
-    print ("Pronto!")
-
-    cv2.waitKey()
-    cv2.destroyAllWindows()
+clicks = []
+image = cv2.imread('kidney.png', 0)
+ret, img = cv2.threshold(image, 170, 255, cv2.THRESH_BINARY)
+cv2.namedWindow('Input')
+cv2.setMouseCallback('Input', on_mouse, 0, )
+cv2.imshow('Input', img)
+cv2.waitKey()
+seed = clicks[-1]
+out = region_growing(img, seed)
+cv2.imshow('Region Growing', out)
+cv2.waitKey()
+cv2.destroyAllWindows()
